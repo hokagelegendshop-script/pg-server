@@ -1,0 +1,6 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1",
+  "apkUrl": "https://raw.githubusercontent.com/hokagelegendshop-script/pg-server/main/pg-hokage.apk",
+  "releaseNotes": "- Penambahan Halaman Profil User\n- Sinkronisasi Lisensi Lifetime\n- Perbaikan Bug Perizinan"
+}
