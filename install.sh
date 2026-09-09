@@ -49,14 +49,62 @@ echo -e "[*] Membangun file sistem PG Server..."
 # Membuat file webhook_gopay.php dasar (Bisa Anda kembangkan nanti)
 cat << 'EOF' > "$WEB_DIR/webhook_gopay.php"
 <?php
-// Menerima POST data dari Aplikasi Android Hokage PG Server
-$data = file_get_contents('php://input');
-if(!empty($data)) {
-    file_put_contents('log_transaksi.txt', $data . PHP_EOL, FILE_APPEND);
-    // Masukkan logika CURL ke Telegram Bot (kyt bot) Anda di sini
+// webhook_gopay.php (DENGAN FITUR LOGGING)
+
+// Lokasi file log untuk memantau error
+$log_file = '/var/www/html/gopay_log.txt';
+
+function tulis_log($pesan) {
+    global $log_file;
+    file_put_contents($log_file, date('Y-m-d H:i:s') . " - " . $pesan . "\n", FILE_APPEND);
 }
-http_response_code(200);
-echo "Webhook Hokage Aktif!";
+
+$package = isset($_POST['package']) ? $_POST['package'] : '';
+$text = isset($_POST['text']) ? $_POST['text'] : '';
+
+tulis_log("--- WEBHOOK MASUK ---");
+tulis_log("Dari: $package | Teks: $text");
+
+if ($package !== 'com.gojek.gopaymerchant') {
+    die("Akses ditolak");
+}
+
+preg_match('/Rp\s*([\d\.]+)/', $text, $matches);
+
+if (isset($matches[1])) {
+    $nominal_bayar = (int)str_replace('.', '', $matches[1]);
+    tulis_log("Nominal Berhasil Diekstrak: $nominal_bayar");
+
+    $db_path = '/root/bot_store/store_data.db'; 
+
+    try {
+        $pdo = new PDO("sqlite:" . $db_path);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $query = "UPDATE transactions 
+                  SET status = 'paid' 
+                  WHERE amount = :amount 
+                  AND status = 'pending' 
+                  AND source = 'GOPAY'";
+                  
+        $stmt = $pdo->prepare($query);
+        $stmt->bindParam(':amount', $nominal_bayar, PDO::PARAM_INT);
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            tulis_log("✅ SUKSES: Database berhasil diubah ke PAID untuk nominal $nominal_bayar");
+        } else {
+            tulis_log("⚠️ INFO: Tidak ada tagihan PENDING di database dengan nominal $nominal_bayar (Atau transaksi sudah expired/sukses)");
+        }
+
+    } catch (PDOException $e) {
+        tulis_log("❌ ERROR DATABASE: " . $e->getMessage());
+    }
+} else {
+    tulis_log("❌ GAGAL: Tidak bisa memotong angka dari teks.");
+}
+
+echo "OK";
 ?>
 EOF
 
