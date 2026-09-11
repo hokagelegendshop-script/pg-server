@@ -26,7 +26,6 @@ echo -e "\n[*] Memverifikasi lisensi ke database pusat..."
 URL_LISENSI="https://raw.githubusercontent.com/hokagelegend/lisensi/main/ijin"
 DATA_LISENSI=$(curl -s "$URL_LISENSI")
 
-# Cek apakah baris '## namaclient-ipvps' ada di file ijin
 if echo "$DATA_LISENSI" | grep -iq "## $CLIENT_NAME-$VPS_IP"; then
     echo -e "${GREEN}[+] Lisensi Valid! Akses instalasi diizinkan.${NC}\n"
 else
@@ -36,7 +35,7 @@ else
     exit 1
 fi
 
-# 3. Instalasi Web Server & Dependensi (Ubuntu/Debian)
+# 3. Instalasi Web Server & Dependensi
 echo -e "[*] Memperbarui sistem dan menginstal Nginx + PHP..."
 apt-get update -y
 apt-get install -y nginx php-fpm php-curl php-json curl unzip software-properties-common
@@ -45,14 +44,13 @@ apt-get install -y nginx php-fpm php-curl php-json curl unzip software-propertie
 WEB_DIR="/var/www/hokage_pg"
 mkdir -p "$WEB_DIR"
 
-echo -e "[*] Membangun file sistem PG Server..."
-# Membuat file webhook_gopay.php dasar (Bisa Anda kembangkan nanti)
+echo -e "[*] Membangun file sistem PG Server & Webhook..."
 cat << 'EOF' > "$WEB_DIR/webhook_gopay.php"
 <?php
 // webhook_gopay.php (DENGAN FITUR LOGGING)
 
-// Lokasi file log untuk memantau error
-$log_file = '/var/www/html/gopay_log.txt';
+// Path log disamakan dengan folder aplikasi Nginx
+$log_file = '/var/www/hokage_pg/gopay_log.txt';
 
 function tulis_log($pesan) {
     global $log_file;
@@ -75,7 +73,8 @@ if (isset($matches[1])) {
     $nominal_bayar = (int)str_replace('.', '', $matches[1]);
     tulis_log("Nominal Berhasil Diekstrak: $nominal_bayar");
 
-    $db_path = '/root/bot_store/store_data.db'; 
+    // PATH DATABASE SUDAH DIPERBAIKI (TIDAK DI /root/)
+    $db_path = '/var/www/html/store_data.db'; 
 
     try {
         $pdo = new PDO("sqlite:" . $db_path);
@@ -92,9 +91,9 @@ if (isset($matches[1])) {
         $stmt->execute();
 
         if ($stmt->rowCount() > 0) {
-            tulis_log("✅ SUKSES: Database berhasil diubah ke PAID untuk nominal $nominal_bayar");
+            tulis_log("✅ SUKSES: Database diubah ke PAID (Nominal $nominal_bayar)");
         } else {
-            tulis_log("⚠️ INFO: Tidak ada tagihan PENDING di database dengan nominal $nominal_bayar (Atau transaksi sudah expired/sukses)");
+            tulis_log("⚠️ INFO: Tidak ada tagihan PENDING (Atau sudah expired) untuk nominal $nominal_bayar");
         }
 
     } catch (PDOException $e) {
@@ -108,8 +107,22 @@ echo "OK";
 ?>
 EOF
 
+# Perbaikan Izin (Permissions) untuk Folder Webhook
 chown -R www-data:www-data "$WEB_DIR"
 chmod -R 755 "$WEB_DIR"
+
+# Perbaikan Izin Database Telegram
+echo -e "[*] Memperbaiki hak akses & lokasi Database SQLite..."
+if [ -f "/root/bot_store/store_data.db" ]; then
+    mv /root/bot_store/store_data.db /var/www/html/store_data.db
+    echo -e "${YELLOW}Database dipindahkan dari /root/ ke /var/www/html/ agar terbaca oleh Webhook.${NC}"
+fi
+
+# Pastikan file ada lalu set ownership ke Nginx (www-data)
+touch /var/www/html/store_data.db
+chown www-data:www-data /var/www/html/store_data.db
+chmod 664 /var/www/html/store_data.db
+chown -R www-data:www-data /var/www/html/
 
 # 5. Konfigurasi Nginx di Port 81
 echo -e "[*] Mengonfigurasi Nginx di Port 81..."
@@ -131,7 +144,7 @@ server {
 }
 EOF
 
-# Auto-deteksi versi PHP-FPM di VPS klien agar tidak error
+# Auto-deteksi versi PHP-FPM di VPS klien
 PHP_SOCK=$(find /var/run/php/ -name "*.sock" | head -n 1)
 if [ ! -z "$PHP_SOCK" ]; then
     sed -i "s|unix:/var/run/php/php8.1-fpm.sock;|unix:$PHP_SOCK;|g" /etc/nginx/sites-available/hokage_pg
