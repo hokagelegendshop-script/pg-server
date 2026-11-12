@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
+  "versionCode": 6,
+  "versionName": "1.5",
   "apkUrl": "https://raw.githubusercontent.com/hokagelegendshop-script/pg-server/main/pg-hokage.apk",
-  "releaseNotes": "Hardening Webhook: Wajib HTTPS + Header X-Webhook-Token\nHapus Bypass SSL HostnameVerifier (Anti-MITM OTA Update)\nFilter Ketat Anti-Payout & Anti-Promo GoPay Spiker\nAuto-Retry 3x & Antrean Offline saat Sinyal Putus\nPerbaikan Hitungan Saldo Dashboard & Menu Panduan Webhook"
+  "releaseNotes": "Logo baru Hokage Legend Payment Gateway\nSplash Screen Animasi Naruto Sage Mode + Partikel Chakra\nTampilan logo tajam di layar kunci, drawer, dan notifikasi layanan"
 }
